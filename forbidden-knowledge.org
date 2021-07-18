@@ -1,0 +1,899 @@
+#+Title: Cool Python Notes
+#+Subtitle: Also known as ``Forbidden Knowledge''
+#+Author: uocsclub
+
+Note that in all of the following, I'm talking about CPython.
+
+Also note that this is going to be presented in the form of a lecture
+and none of the material has been reviewed. I think.
+
+* Function argument wizardry
+  What is the ~*~ operator in Python?
+
+  It's multiplication.
+
+  Hahaha jk it's unpacking of an iterable in a function argument
+  list. Let's play a koan game.
+
+  #+begin_src python
+    >>> def args(*args):
+    ...     return args
+  #+end_src
+  This seems like a pretty simple function, but this is not the
+  case. This function is a looking glass through which we can observe
+  the functioning of python.
+
+  What does the star syntax mean in the argument?
+
+  It means to take the arguments passed to the function, put them in a
+  tuple, and make that tuple be ~args~.
+  #+begin_src python
+    >>> args(1, 2, 3)
+    (1, 2, 3)
+  #+end_src
+
+  The ~*~ operator isn't only used at function definition time, it has
+  semantics at function call time too.
+  #+begin_src python
+    >>> args(*[1, 2, 3])
+    (1, 2, 3)
+  #+end_src
+  In this case, it means to ``unpack'' what it is applied to (it's a
+  prefix unary operator). It's a prefix (comes before its operand)
+  unary (it only takes
+  one operand) operator.
+
+  This is pretty cool, but how does it behave when there are other
+  arguments in play?
+  #+begin_src python
+    >>> args(1, *[2, 3, 4])
+    (1, 2, 3, 4)
+  #+end_src
+  It seems to unpack each of its elements in place, as if the
+  structure over which we're iterating did not even exist (and to the
+  function we're passing this to, it does not).
+
+  Let's do some more tests to confirm that this is actually how it works.
+  #+begin_src python
+    >>> args(1, *[2, 3, 4], 5)
+    (1, 2, 3, 4, 5)
+
+    >>> args(1, *[2, 3, 4], *zip([1, 2, 3], [4,5,6]))
+    (1, 2, 3, 4, (1, 4), (2, 5), (3, 6))
+  #+end_src
+  And indeed, this is what it does.
+
+  This ~zip~ example merits further examination. What does ~zip~ do?
+  ~zip~ takes an arbitrary number of iterable collections, and
+  iterates over them concurrently, creating tuples with an element
+  from each collection each iteration. Let's look at an example.
+  #+begin_src python
+    >>> zip([1,2,3], [4,5,6])
+    <zip object at 0x7f2d8cdfadc0>
+  #+end_src
+  What's this???? a ~<zip object..~? Haha! I've tricked you into
+  realizing that you can unpack /any generator/ with ~*~ in argument
+  lists.
+  #+begin_src python
+    >>> args(1, *[2, 3, 4], *zip([1, 2, 3], [4,5,6]))
+    (1, 2, 3, 4, (1, 4), (2, 5), (3, 6))
+  #+end_src
+
+  Let's actually look carefully at what this generator contains:
+  #+begin_src python
+    >>> list(zip([1,2,3], [4,5,6]))
+    [(1, 4), (2, 5), (3, 6)]
+  #+end_src
+  You can see that it starts with the first element from each
+  collection, 1 and 4, then the second, 2 and 5, then the third, 3 and 6.
+
+  Think you understand argument packing and unpacking? Let's implement
+  zip.
+  #+begin_src python
+    def zip1(*args):
+        for tup in zip(*args):
+            yield tup
+  #+end_src
+  Hah! You, in your starry-eyed idealism, expected me to give you a real
+  example, but I've fooled you once more, instead again showing you
+  how packing and unpacking are strangely symmetrical. In some sense,
+  they are opposites. Unpacking goes from a data structure to
+  arguments, and packing goes from arguments to a data structure. Not
+  so surprising that they both use the same unary operator, now is it?
+
+  Let's go a whole way around the loop:
+  #+begin_src python
+    def identity_function(*args):
+        return tuple(zip(*zip(*args)))
+
+    >>> identity_function([1,2,3],[4,5,6])
+    ((1, 2, 3), (4, 5, 6))
+  #+end_src
+
+  I'm not actually going to write zip. If you want to be enlightened
+  about the limitations of python, go try and write a clean zip
+  implementation using the features I've just shown you.
+
+  Getting back to the matter at hand, I think I saw someone somewhere
+  using ~**~ in an argument list...
+  #+begin_src python
+    >>> args(**list(zip([1,2,3],[4,5,6])))
+    Traceback (most recent call last):
+      File "<stdin>", line 1, in <module>
+    TypeError: __main__.args() argument after ** must be a mapping, not list
+  #+end_src
+  Oof. Looks like I need a mapping. 
+  #+begin_src python
+    >>> args(**{1: 2, 3: 4})
+    Traceback (most recent call last):
+      File "<stdin>", line 1, in <module>
+    TypeError: keywords must be strings
+  #+end_src
+  Oof. Looks like I need strings. Wait, what does it mean by keyword? 
+  #+begin_src python
+    >>> args(**{'a': 2, 'b': 4})
+    Traceback (most recent call last):
+      File "<stdin>", line 1, in <module>
+    TypeError: args() got an unexpected keyword argument 'a'
+  #+end_src
+  It's taking the dictionary, and passing it as keyword arguments!
+  We'll get to this later.
+  
+  Let's make ~args~ a bit more interesting, sharpening our looking
+  glass...
+  #+begin_src python
+    >>> def args(first, second, *rest):
+    ...     print('first', first)
+    ...     print('second', second)
+    ...     print('rest', rest)
+  #+end_src
+  We now have another definition of args, one with a combination of
+  positional args and unpacking.
+
+  Using unpacking in this way takes the ``rest'' of the arguments passed
+  to the function and squashes them into a tuple.
+  #+begin_src python
+    >>> args(1, 2, 3, 4, 5)
+    first 1
+    second 2
+    rest (3, 4, 5)
+  #+end_src
+
+  Okay, let's combine this with the keyword arg passing through a
+  dictionary that we had earlier.
+  #+begin_src python
+    >>> args(**dict(first=0, second=1, rest=(1,2,3,4)))
+    Traceback (most recent call last):
+      File "<stdin>", line 1, in <module>
+    TypeError: args() got an unexpected keyword argument 'rest'
+  #+end_src
+  Oops, looks like we can't refer to an unpacking argument in keyword
+  arguments.
+  #+begin_src python
+    >>> args(**dict(first=0, second=1))
+    first 0
+    second 1
+    rest ()
+  #+end_src
+  Ooh, but we can definitely pass to normal arguments this way. What
+  about if we try to pass more arguments afterwards to fill in ~rest~?
+  #+begin_src python
+    >>> args(**dict(first=0, second=1), 'wowza')
+      File "<stdin>", line 1
+        args(**dict(first=0, second=1), 'wowza')
+                                               ^
+    SyntaxError: positional argument follows keyword argument unpacking
+  #+end_src
+  No dice. But, the astute among you might be thinking to
+  yourselves that this seems a lot like what happens when you try to
+  pass an argument after a keyword argument.
+  #+begin_src python
+    >>> args(first=1, second=2, 'wowza')
+      File "<stdin>", line 1
+        args(first=1, second=2, 'wowza')
+                                       ^
+    SyntaxError: positional argument follows keyword argument
+  #+end_src
+  This gives a very very very strong clue about how this is all
+  implemented under the hood...
+  #+begin_src python
+    >>> args(first=1, second=2)
+    first 1
+    second 2
+    rest ()
+    >>> args(**{'first':1, 'second':2})
+    first 1
+    second 2
+    rest ()
+    >>> args(**dict(first=1, second=2))
+    first 1
+    second 2
+    rest ()
+  #+end_src
+  What about if we pass an argument before the dictionary?
+  #+begin_src python
+    >>> args('wowza', **dict(first=0, second=1, third=3))
+    Traceback (most recent call last):
+      File "<stdin>", line 1, in <module>
+    TypeError: args() got multiple values for argument 'first'
+    >>> args(**dict(first=0, second=1, third=3))
+    Traceback (most recent call last):
+      File "<stdin>", line 1, in <module>
+    TypeError: args() got an unexpected keyword argument 'third'
+  #+end_src
+
+  Okay, now that we're comfortable with unpacking dictionaries, let's
+  pack them.
+  #+begin_src python
+    >>> def args(first, second, **rest):
+    ...     print('first', first)
+    ...     print('second', second)
+    ...     print('rest', rest)
+  #+end_src
+  Can you guess what the semantics of this will be?
+  #+begin_src python
+    >>> args(1, 2, 3)
+    Traceback (most recent call last):
+      File "<stdin>", line 1, in <module>
+    TypeError: args() takes 2 positional arguments but 3 were given
+    >>> args(1, 2, one=1, two=2)
+    first 1
+    second 2
+    rest {'one': 1, 'two': 2}
+  #+end_src
+  Okay, this is getting epic. What about if we pass first and second
+  as keyword arguments?
+  #+begin_src python
+    >>> args(first=1, second=2)
+    first 1
+    second 2
+    rest {}
+    >>> args(one=1, two=2, first=1, second=2)
+    first 1
+    second 2
+    rest {'one': 1, 'two': 2}
+  #+end_src
+  So you're telling me the order of keyword arguments doesn't matter???
+
+  One more thing to blow your mind...
+  
+  #+begin_src python
+    def args(*args, **kwargs):
+        print("args", args)
+        print("kwargs", kwargs)
+  #+end_src
+
+  You can use both simultaneously. 
+  #+begin_src python
+    >>> args(1, 2, 3, test=4, five=5)
+    args (1, 2, 3)
+    kwargs {'test': 4, 'five': 5}
+  #+end_src
+  
+* Food for thought about objects
+  Here's some food for thought...
+
+  So, you're saying that there's a direct correspondence between
+  keyword arguments and string-keyed dictionaries... And, note the
+  syntax similarities...
+
+  Did you know that short strings are interned in Python? This means
+  that when you use the same string multiple times, you always refer
+  to the exact same object and comparison and hashing can then be done
+  by pointer. Python string interning is done with an internal global
+  dictionary.
+
+  Did you know that in Python, the names of functions, variables,
+  arguments, etc, are all stored as the same kind of string that you
+  use in the language, and are all interned?
+
+  This means that short strings in Python have some extremely valuable
+  properties. Their equality comparison is constant time. Their
+  hashing is constant time. Think about what that means for the
+  implementation of the Python language constructs.
+
+  Let's take a look at ~args~.
+  #+begin_src python
+    >>> args
+    <function args at 0x7f2d8cc8aca0>
+  #+end_src
+  Yes, it's a function, but what is a function?
+  #+begin_src python
+    >>> dir(args)
+    ['__annotations__', '__call__', '__class__', '__closure__',
+     '__code__', '__defaults__', '__delattr__', '__dict__', '__dir__',
+     '__doc__', '__eq__', '__format__', '__ge__', '__get__',
+     '__getattribute__', '__globals__', '__gt__', '__hash__', '__init__',
+     '__init_subclass__', '__kwdefaults__', '__le__', '__lt__',
+     '__module__', '__name__', '__ne__', '__new__', '__qualname__',
+     '__reduce__', '__reduce_ex__', '__repr__', '__setattr__',
+     '__sizeof__', '__str__', '__subclasshook__']
+  #+end_src
+  What's this? These are all internal functions which implement ~args~'
+  functionality.
+  #+begin_src python
+    >>> args.__call__
+    <method-wrapper '__call__' of function object at 0x7f2d8cc8aca0>
+    >>> args.__call__(1, 2)
+    first 1
+    second 2
+    rest ()
+  #+end_src
+  Isn't that interesting...
+
+  What about an object?
+  #+begin_src python
+    >>> class Thing():
+    ...     pass
+    ... 
+    >>> Thing()
+    <__main__.Thing object at 0x7f2d8cecab80>
+    >>> 
+    >>> t = Thing()
+    >>> dir(t)
+    ['__class__', '__delattr__', '__dict__', '__dir__', '__doc__',
+     '__eq__', '__format__', '__ge__', '__getattribute__', '__gt__',
+     '__hash__', '__init__', '__init_subclass__', '__le__', '__lt__',
+     '__module__', '__ne__', '__new__', '__reduce__', '__reduce_ex__',
+     '__repr__', '__setattr__', '__sizeof__', '__str__',
+     '__subclasshook__', '__weakref__']
+  #+end_src
+  Let's look at the most interesting element here...
+  #+begin_src python
+    >>> t.__dict__
+    {}
+    >>> t.__dict__['args'] = args
+    >>> t.__dict__
+    {'args': <function args at 0x7f2d8cc8aca0>}
+  #+end_src
+  Can you guess what comes next?
+  #+begin_src python
+    >>> t.args
+    <function args at 0x7f2d8cc8aca0>
+    >>> t.args(1, 2, 3, 4, 5)
+    first 1
+    second 2
+    rest (3, 4, 5)
+    >>> 
+  #+end_src
+  What does this tell us about the implementation of Python's object
+  system?
+
+  Can you hear the meta-object programming calling to you? Can you
+  smell the sweet scent of metaprogramming?
+
+  If you don't hear meta-object programming calling to you, please
+  refer to the following code taken from Peter Norvig's blog:
+  #+begin_src python
+    class Struct:
+        "A structure that can have any fields defined."
+        def __init__(self, **entries): self.__dict__.update(entries)
+
+    >>> options = Struct(answer=42, linelen=80, font='courier')
+    >>> options.answer
+    42
+    >>> options.answer = 'plastics'
+    >>> vars(options)
+    {'answer': 'plastics', 'font': 'courier', 'linelen': 80}
+  #+end_src
+
+  Now, think about what this means for the previous section. How do
+  you think argument passing is actually implemented under the hood?
+  How do you think packing and unpacking is done?
+  
+* Function decorators (AKA functional programming from first principles)
+  In Python, there exists something very cool called a function
+  decorator.
+
+  It looks like this:
+  #+begin_src python
+    @function_decorator
+    def f(something):
+        return something
+  #+end_src
+
+  What is it? It's something that can change the way your functions
+  behave without changing their bodies.
+
+  As for how it's actually implemented, it's a function which takes as
+  its argument another function, and returns a new function. The
+  original function is then defined as the new function returned by
+  the decorator.
+
+  What's the do-nothing decorator?
+  #+begin_src python
+    def do_nothing_dec(func):
+        return func
+  #+end_src
+  And, so, we can decorate a function by putting ~@<decorator-name>~
+  before the function definition when defining it. It works in the
+  shell, too.
+  #+begin_src python
+    @do_nothing_dec
+    def f():
+        return 5
+    
+    >>> f()
+    5
+  #+end_src
+
+  Cool. Let's make it even cooler. 
+  #+begin_src python
+    def add_five(func):
+        return lambda: func() + 5
+  #+end_src
+  Can you guess what this does to a function it decorates?
+  #+begin_src python
+    @add_five
+    def f():
+        return 5
+
+    >>> f()
+    10
+  #+end_src
+
+  But wait, I saw somewhere (I can't remember where) that decorators
+  can take arguments! Let's add that in.
+  #+begin_src python
+    def add_some(func, num):
+        return lambda: func() + num 
+  #+end_src
+  And, here we go!
+  #+begin_src python
+    >>> @add_some(4)
+    ... def f():
+    ...     return 5
+    ... 
+    Traceback (most recent call last):
+      File "<stdin>", line 1, in <module>
+    TypeError: add_some() missing 1 required positional argument: 'num'
+  #+end_src
+
+  Huh? It didn't work. But, we know that ~add_some~ works as we're
+  intending, it does return a function which behaves as expected.
+  #+begin_src python
+    >>> f()
+    10
+    >>> add_some(f, 4)
+    <function add_some.<locals>.<lambda> at 0x7f2d8cc8ae50>
+    >>> add_some(f, 4)()
+    14
+  #+end_src
+
+  So, how is this supposed to work? We know that decorators can only
+  take one argument, the function they're applied to.
+
+  How do we pass arguments to a decorator?
+
+  (Pause for dramatic effect)
+
+  We create a function that returns a decorator.
+  #+begin_src python
+    def add_some(num):
+        def add_other(func):
+            return lambda: func() + num 
+        return add_other
+  #+end_src
+  Note how ~add_other~ refers to ~num~, which is not in its body.
+  This kind of function (which refers to variables outside of its
+  body) is called a *closure* (and is one of the most important things
+  you could learn, period. The power of closures is incredible.).
+  #+begin_src python
+    >>> @add_some(5)
+    ... def f():
+    ...     return 3
+    ... 
+    >>> f()
+    8
+  #+end_src
+  You can read this as ~@(add_some(5))~. It's evaluating ~add_some(5)~
+  before trying to use the result as a decorator.
+  
+  What can you use it for? Let's say we had some complicated problem
+  with our recursive program that we couldn't figure out how to
+  solve. Every time you call it, it loops infinitely!
+
+  The boring way to debug that is adding print statements. The /m e t
+  a/ way of doing it is with decorators:
+  #+begin_src python
+    def trace(func):
+        def traced_fun(*args, **kwargs):
+            print(f"Call -- {args}, {kwargs}")
+            return func(*args, *kwargs)
+        return traced_fun
+  #+end_src
+  So, let's annotate the function that we couldn't debug.
+  #+begin_src python
+    >>> @trace
+    ... def f(a):
+    ...     if a == 0:
+    ...             return "you're done!"
+    ...     else:
+    ...             return f(a - 1)
+  #+end_src
+  And the veil is removed from your eyes in real time!
+  #+begin_src python
+    >>> f(-1)
+    Call -- (-1,), {}
+    Call -- (-2,), {}
+    Call -- (-3,), {}
+    Call -- (-4,), {}
+    Call -- (-5,), {}
+    Call -- (-6,), {}
+    Call -- (-7,), {}
+    Call -- (-8,), {}
+    Call -- (-9,), {}
+    ...
+    ...
+  #+end_src
+  Aha!
+  #+begin_src python
+    >>> f(5)
+    Call -- (5,), {}
+    Call -- (4,), {}
+    Call -- (3,), {}
+    Call -- (2,), {}
+    Call -- (1,), {}
+    Call -- (0,), {}
+    "you're done!"
+  #+end_src
+
+  Alright, so our /m e t a  t r a c e r/ seems to work as
+  expected. But, you know what they say about leaky
+  abstractions. Sometimes things are not always what they seem.
+
+  #+begin_src python
+    >>> f.__name__
+    'traced_fun'
+  #+end_src
+  What is this? ~f~'s name is 'traced-fun'? That can't be right. Let's
+  cook up some more /m e t a - o b j e c t/ goodness.
+
+  Let's say we want the ~traced_fun~ we're returning to have some of
+  the same attributes as the original functon that's passed. Let's
+  look at ~f~.
+  #+begin_src python
+    >>> dir(f)
+    ['__annotations__', '__call__', '__class__', '__closure__',
+     '__code__', '__defaults__', '__delattr__', '__dict__', '__dir__',
+     '__doc__', '__eq__', '__format__', '__ge__', '__get__',
+     '__getattribute__', '__globals__', '__gt__', '__hash__', '__init__',
+     '__init_subclass__', '__kwdefaults__', '__le__', '__lt__',
+     '__module__', '__name__', '__ne__', '__new__', '__qualname__',
+     '__reduce__', '__reduce_ex__', '__repr__', '__setattr__',
+     '__sizeof__', '__str__', '__subclasshook__']
+  #+end_src
+  Looks to me like we'd want ~__module__~, ~__name__~, ~__qualname__~,
+  ~__doc__~, and ~__annotations__~ to stay the same after wrapping.
+
+  How shall we implement this, I hear you ask? Why, /m e t a - f u n c
+  t i o n - d e c o r a t o r s/, of course!
+  #+begin_src python
+    def wraps(wrapped):
+        def wrap(wrapper):
+            for attr in ('__module__', '__name__', '__qualname__',
+                         '__doc__', '__annotations__'):
+                try:
+                    val = getattr(wrapped, attr)
+                except AttributeError:
+                    pass
+                else:
+                    setattr(wrapper, attr, val)
+            wrapper.__dict__.update(getattr(wrapped, '__dict__', {}))
+            return wrapper
+
+        return wrap
+  #+end_src
+
+  Walking through this, line by line.
+
+  #+begin_src python
+    def wraps(wrapped):
+  #+end_src
+  we have a function which returns a decorator.
+  #+begin_src python
+        def wrap(wrapper):
+  #+end_src
+  Here's the decorator we're returning. It wraps a wrapper.
+  #+begin_src python
+            for attr in ('__module__', '__name__', '__qualname__',
+                         '__doc__', '__annotations__'):
+  #+end_src
+  These are all the attributes we want to conserve from the wrapped
+  function in our new wrapper.
+  #+begin_src python
+                try:
+                    val = getattr(wrapped, attr)
+  #+end_src
+  Try and get those attributes. If it fails, though:
+  #+begin_src python
+                except AttributeError:
+                    pass
+  #+end_src
+  We don't set them, because they don't exist.
+  #+begin_src python
+                else:
+                    setattr(wrapper, attr, val)
+  #+end_src
+  If they do exist, then set the wrapper's attributes to the
+  corresponding values from the wrapped one.
+  #+begin_src python
+            wrapper.__dict__.update(getattr(wrapped, '__dict__', {}))
+  #+end_src
+  What's more, make sure the new function matches the old one's dict.
+  #+begin_src python
+            return wrapper
+  #+end_src
+  Return our wrapper from the actual decorator.
+  #+begin_src python
+        return wrap
+  #+end_src
+  Return the real decorator.
+  
+  So, recap on what you just learned. You can write decorators which
+  decorate decorators which use Python meta-object facilities to
+  modify functions to remain debuggable after decoration.
+  
+  And, as a funny example:
+  #+begin_src python
+    >>> @wraps(f)
+    ... def f2():
+    ...     return 10
+    ... 
+    >>> f2()
+    10
+    >>> f2.__name__
+    'traced_fun'
+  #+end_src
+  Now we know it works.
+
+  Also, you think I invented this ~@wraps~ thing? No, I stole it from the
+  ~functools~ package. Look for ~update_wrapper~ and ~wraps~ in
+  ~Lib/functools.py~ of the ~git@github.com:python/cpython~ repository
+  to see more about it. In general, if you don't understand how
+  something is implemented, go read the python source code!
+
+  Now, let's get the (meta-)meta party started.  Did you think that
+  decorators only applied to functions? I can't believe you would
+  think something so un-meta.
+  #+begin_src python
+    def class_wrapper(class_to_be_wrapped):
+        for key, val in vars(class_to_be_wrapped).items():
+            if callable(val):
+                setattr(class_to_be_wrapped, key, trace(val))
+        return class_to_be_wrapped
+  #+end_src
+  This decorator applies the ~@trace~ decorator to each of the
+  attributes of ~class_to_be_wrapped~ which can be called (implement
+  the ~callable~ interface).
+  #+begin_src python
+    >>> @class_wrapper
+    ... class TracedClass():
+    ...     def __init__(self, test):
+    ...             self.test = test
+    ...     def some_method(self):
+    ...             return self.test
+    ... 
+    >>> t = TracedClass("woah there pardner")
+    Call -- (<__main__.TracedClass object at 0x7f2d8cdcce50>, 'woah there pardner'), {}
+    >>> t.some_method()
+    Call -- (<__main__.TracedClass object at 0x7f2d8cdcce50>,), {}
+    'woah there pardner'
+  #+end_src
+
+* The problem with interpretation
+  So, we've gathered that the internals of python are implemented
+  largely using python data structures. What does this tell us?
+
+  - we can do almost nothing in the language without having to lookup
+    a key in a dictionary, at the very least. A method call involves a
+    lookup, a function call often involves the consing of various data
+    structures (especially tuples. Did you know that tuples are stored
+    on the heap, not the stack? Of course you did, everything is on
+    the heap). Every single time ~.~ is used, a lookup is done in some
+    dictionary.
+  - Because the language semantics are implemented with these data
+    structures (as opposed to, say, vtables in C++, and similar things
+    in other similarly object oriented languages), you're never
+    going to escape a certain slow speed at which you're doing
+    anything. Most of the best applications for python are thin
+    wrappers over top of other libraries to get out of the python
+    speed trap (ML, scientific computing) (and, also to reuse existing
+    codebases. Isn't it nice that python has this C API that is easy
+    to program to?).
+  
+* A meta-object application (-> meta-app -> metapp)
+  Let's take advantage of some of these newfangled python features to
+  write something interesting. 
+  
+  With the help of a handful of miracles, we're going to write a lisp
+  interpreter. In particular, we're going to write a Scheme
+  interpreter. Scheme is a small and simple, but very powerful
+  language.
+
+  Let's talk about some of the components of our interpreter.
+
+** Data types
+   Scheme uses a handful of data types that we'll need to implement.
+   
+   - Booleans (we're going to use ~True~ and ~False~ for this)
+   - Numbers (we're going to hack together python's number system)
+   - Characters (we're going to use python single-character strings)
+   - Strings (python strings)
+   - Symbols (python strings)
+   - Pairs and lists (python tuples and lists)
+   - Vectors (python lists)
+   - Procedures (python object)
+
+** Expressions
+   In scheme, most things are /expressions/ evaluated to produce a
+   /value/ in some environment. (or more than one value)
+
+   There are literal expressions, such as ~#t~, or any number.
+   
+   There are also compound expressions, which are composed of a pair
+   of parenthese around sub-expressions. The first subexpression is an
+   operation, the rest of the subexpressions are operands.
+   
+*** Let's be pedantic about expressions for a sec.
+    When you see a form such as ~(a b c)~, you're seeing an s-exp, or
+    s-expression, or symbol-expression. These are commonly called
+    "Forms". Forms are the superset composed of expressions,
+    definitions, so-called "special forms", etc.
+   
+** Environment and binding
+   In scheme, there exist variables (gasp) which refer to values. We
+   can bind variables using a ~let~ expression. Those variables are
+   then bound in that let expression. The variables in the let
+   expression are local.
+
+** Definitions
+   It is also possible to define global variables with a
+   ~define~. ~define~ creates what is called a 'top-level'
+   definition. ~define~ forms are /definitions/, not
+   expressions. They can't appear in the places that a normal variable
+   can.
+
+** Procedures
+   We can implement the procedures as python callable objects, and
+   have their call be equivalent to the evaluation of the function
+   body with the arguments bound.
+   
+* Alright, we have enough to implement a first try at the interpreter.
+  We're going to need some way to parse the forms. Let's split it in
+  two. First, we're going to split the input into tokens with some
+  clever python hacks, and then we're going to parse the tokens into a
+  tree.
+  
+  We use python's ~split~ to actually split the string, which saves us
+  a metric ton of effort.
+  #+BEGIN_SRC python
+    def tokenize(text):
+        return text.replace('(', ' ( ')\
+                   .replace(')', ' ) ')\
+                   .replace("'", " ' ")\
+                   .split()
+  #+END_SRC
+  
+  Afterwards, we use a simple recursive thing to turn it into a list
+  structure.
+  #+BEGIN_SRC python
+    def treeify(tokens):
+        return treeify_aux(tokens)[1]
+    
+    # goes from tokens to a python list 
+    def treeify_aux(tokens, i=0, sublist=False):
+        done = False
+        acc = []
+        while i < len(tokens):
+            if tokens[i] == '(':
+                i, res = treeify_aux(tokens, i + 1, True)
+                acc.append(res)
+            elif tokens[i] == ')':
+                if not sublist:
+                    raise Exception(f"unmatched close-paren at token index {i}")
+                else:
+                    return (i + 1, acc)
+            else:
+                acc.append(sym(tokens[i]))
+                i += 1
+    
+        if not sublist:
+            return (i, acc)
+        else:
+            raise Exception(f"unbalanced open-paren")
+
+    def sym(s):
+        try:
+            return int(s)
+        except ValueError:
+            try:
+                return float(s)
+            except ValueError:
+                return s # this is a string
+  #+END_SRC
+
+  Let's test it out.
+  #+BEGIN_SRC python
+    >>> tokenize("(define (F a) (+ a a))")
+    ['(', 'define', '(', 'F', 'a', ')', '(', '+', 'a', 'a', ')', ')']
+
+    >>> treeify(tokenize("(define (F a) (+ a a)) (let ((x 2)) (+ x x))"))
+    [['define', ['F', 'a'], 
+                ['+', 'a', 'a']], 
+     ['let', [['x', '2']], 
+             ['+', 'x', 'x']]]
+  #+END_SRC
+  I added some indentation to the second example to make it a bit
+  easier to read.
+  
+** What's in an environment?
+   When we have a symbol whose binding we want to access, we first look
+   at the current lexical scope, then at the set of definitions.
+   
+   The lexical scope is a linked list of dictionaries, (a stack,
+   effectively) which represent the bindings that are present in
+   scope. We start from the top of the stack, and go downwards,
+   returning the first match we find. 
+   
+   (define) works by modifying the global scope.
+   
+   #+begin_src python
+     import operator as op
+     import math
+     # an Environment is nothing but a mapping from keys to values which
+     # has an outer sccope
+     class Env(dict):
+         def __init__(self, init={}, outer=None):
+             self.update(init)
+             self.outer = outer
+             # return the env which contains this key
+         def find(self, key):
+             return self if (key in self) else\
+                 (self.outer.find(key) if self.outer else None)
+ 
+     global_env = Env({
+         '+': op.add, '-':op.sub, '*':op.mul, '/':op.truediv,
+         '>':op.gt, '<':op.lt, '>=':op.ge, '<=':op.le, '=':op.eq,
+         'abs':     abs,
+         'append':  op.add,
+         'apply':   lambda f, args: f(*args),
+         'begin':   lambda *x: x[-1],
+         'car':     lambda x: x[0],
+         'cdr':     lambda x: x[1:],
+         'cons':    lambda x,y: [x] + y,
+         'eq?':     op.is_,
+         'equal?':  op.eq,
+         'length':  len,
+         'list':    lambda *x: list(x),
+         'list?':   lambda x: isinstance(x,list),
+         'map':     map,
+         'max':     max,
+         'min':     min,
+         'not':     op.not_,
+         'null?':   lambda x: x == [],
+         'number?': lambda x: isinstance(x, Number),
+         'procedure?': callable,
+         'round':   round,
+         'symbol?': lambda x: isinstance(x, Symbol),
+     })
+     global_env.update(filter(lambda x: x[0].find('__') == -1, vars(math).items()))
+   #+end_src
+   
+   Here we define all the most important scheme procedures.
+  
+** What's in a procedure?
+   #+begin_src python
+     class Proc(object):
+         def __init__(self, args, body, env, name="lambda"):
+             self.args = args
+             self.body = body
+             self.env = env # This is for closures
+             self.__name__ = name
+         def __call__(self, *args):
+             if len(args) != len(self.args):
+                 raise Exception("Bad # of arguments passed to ")
+             e = Env(dict(zip(self.args, args)), self.env)
+             print('body', self.body)
+             return [tar(x, e) for x in self.body][-1]
+   #+end_src
