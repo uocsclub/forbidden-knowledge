@@ -19,15 +19,15 @@
 
   However, functional programming isn't only used on the frontend. The
   separation between code and data offers modularity when doing data
-  transformations. Continuation passing offers wonderfully expressive
-  and powerful abstractions (which we might learn about at a later
-  date). Advanced type theory (which is a branch of functional
-  proramming, effectively) is used to prove properties of programs to
-  ensure they are memory safe (no leaks and/or use-after-frees and/or
-  null dereference and/or aliasing). The list of applications of
-  functional programming is too long to list, because it is the the
-  same applications as any other paradigm, i.e., programming in its
-  entirety.
+  transformations for stuff like data pipelines. Continuation passing
+  offers wonderfully expressive and powerful abstractions (which we
+  might learn about at a later date). Advanced type theory (which is a
+  branch of functional proramming, effectively) is used to prove
+  properties of programs to ensure they are memory safe (no leaks
+  and/or use-after-frees and/or null dereference and/or aliasing). The
+  list of applications of functional programming is too long to list,
+  because it is the the same applications as any other paradigm, i.e.,
+  programming in its entirety.
 
   Thinking functionally lets you be exceptionally productive while
   ensuring that the programs you write will be modular and
@@ -169,6 +169,45 @@
 
    Once you have a function, you can pass it around, call it, wrap it
    in another function, put it in a list, a dictionary, etc.
+   
+** List processing
+   LISP, the language, originally stood as an acronym for List
+   Processing, but over time it has grown to simply be another name.
+
+   Lisp's list facilities are fantastically easy to use (it's almost
+   as if the language was built to accomodate this???). The only three
+   functions you need to remember are ~cons~, ~car~, and ~cdr~.
+
+   #+begin_src scheme
+     ;; Creating a list
+     (cons 'a (cons 'b (cons 'c '())))
+     ;; [whiteboard]
+     ;; this is equivalent to:
+     (list 'a 'b 'c)
+     ;; Also equivalent to
+     '(a b c)
+   #+end_src
+
+   When you have a list, you can use ~car~ to get the first element of
+   the list, and ~cdr~ to access the rest of the list.
+   #+begin_src scheme
+     (car '(a b c)) ;; => 'A
+     (cdr '(a b c)) ;; => '(B C)
+   #+end_src
+
+   What's more, you can use '() to denote the empty list.
+
+   Let's write a small function to return number ranges.
+   #+begin_src scheme
+     (define (range n)
+       (letrec
+           ((range-aux
+             (lambda (n)
+               (cond
+                ((< n 0) '())
+                (#t (cons n (range-aux (- n 1))))))))
+         (reverse (range-aux (- n 1)))))
+   #+end_src
   
 ** So, what does scheme code actually look like?
    In a scheme file, we use "define" in the same place as you'd use
@@ -258,3 +297,125 @@
    disassemble the function interactively to see how it was compiled.
 
    [aside about function-caling on the whiteboard]
+   
+   
+* Macros
+  Lisp's killer feature, believe it or not, is the syntax, or, more
+  specifically, lack thereof. Because scheme/lisp code is the same as
+  a list of symbols, a macro can be thought of nothing but a piece of
+  lisp code which takes as input a list of symbols and returns a list
+  of symbols which gets inserted in the spot that the macro was
+  originally called.
+
+  So what does a macro look like? Almost the same thing as a
+  function. I'll be showing you how to use unhygienic macros (macros
+  that aren't provably correct, so you can do wacky stuff, the sky's
+  the limit and there's no verification)
+  
+* Macros case study
+  Here's a macro which takes a bunch of statements and returns a block
+  with the statements reversed therein (the . in the argument list means
+  the rest of the arguments to the function are passed as a list bound
+  to 'body').
+  #+begin_src scheme
+    (define-macro (backwards . body)
+      (cons 'begin
+            (reverse body)))
+  #+end_src
+  Very simple, isn't it. Nothing
+
+
+* Macros case study part 2: Stuff I wrote in Common Lisp
+
+  #+begin_src lisp
+    (in-package :sb-graph)
+
+    (eval-when (:compile-toplevel :load-toplevel)
+      (defvar *hook-enabled* (make-hash-table)))
+
+    (defmacro hook (fun lambda-list &body body)
+      (let ((ll (gensym))
+            (f (gensym))
+            (orig (gensym)))
+        `(let ((,f ',fun))
+           (when (nth-value 1 (gethash ',f *hook-enabled*))
+             (unhook ,fun))
+           (setf (gethash ,f *hook-enabled*) t)
+           (sb-int::encapsulate ,f 'hook
+                                (lambda (,orig &rest ,ll)
+                                  (when (hook-enabled ,fun)
+                                    (destructuring-bind ,lambda-list ,ll
+                                      (block hook
+                                        ,@body)))
+                                  (apply ,orig ,ll))))))
+    (defmacro disable-hook (fun)
+      (let ((f (gensym)))
+        `(let ((,f ',fun))
+           (when (nth-value 1 (gethash ,f *hook-enabled*))
+             (setf (gethash ',fun *hook-enabled*) nil)))))
+    (defmacro enable-hook (fun)
+      (let ((f (gensym)))
+        `(let ((,f ',fun))
+           (when (nth-value 1 (gethash ,f *hook-enabled*))
+             (setf (gethash ',fun *hook-enabled*) t)))))
+    (defmacro unhook (fun)
+      (let ((f (gensym)))
+        `(let ((,f ',fun))
+           (when (nth-value 1 (gethash ,f *hook-enabled*))
+             (sb-int::unencapsulate ,f 'hook)
+             (remhash ,f *hook-enabled*)))))
+    (defmacro hook-enabled (fun)
+      `(gethash ',fun *hook-enabled*))
+
+    ;; (defun test-hook (a b c &rest d)
+    ;;   (list (+ a b c) d))
+    ;; (hook test-hook (a b c &rest d)
+    ;;   (format t "This is a hook! ~A ~A ~A ~A~%" a b c d))
+    ;; (unhook test-hook)
+    ;; (hook sb-c::compile-toplevel (lambdas load-time-value-p)
+    ;;   (format t "~%Hooking the compiler. compile-toplevel:~%lambdas: ~A~%load-time-value-p: ~A~%"
+    ;;           lambdas load-time-value-p))
+    ;; (unhook sb-c::compile-toplevel)
+    ;; (eval-when (:compile-toplevel :load-toplevel)
+    ;;   (defvar *acc* nil))
+    ;; (hook sb-c::compile-component (component)
+    ;;   (push component *acc*))
+
+    (eval-when (:compile-toplevel :load-toplevel)
+      (defvar *trace-number* 0))
+
+    (hook sb-c::ir2-convert (component)
+      (disable-hook sb-c::ir2-convert)
+      (when (and (streamp sb-c::*compiler-trace-output*)
+                 (find :sb-graph sb-c::*compile-trace-targets*))
+        (let* ((pn (pathname sb-c::*compiler-trace-output*))
+               (out-pn (make-pathname
+                        :host (pathname-host pn)
+                        :directory (pathname-directory pn)
+                        :name
+                        (format nil "trace-~A-~A" (incf *trace-number*)
+                                (coerce (loop for char
+                                                across
+                                                (let ((cn (sb-c::component-name component)))
+                                                  (cond
+                                                    ((symbolp cn) (symbol-name cn))
+                                                    ((stringp cn) cn)
+                                                    ((listp cn) (format nil "~{~a~}" cn))
+                                                    (t "")))
+                                              when (or (alpha-char-p char)
+                                                       (digit-char-p char)
+                                                       (char= char #\-)
+                                                       (char= char #\_))
+                                                collect char)
+                                        'string))
+                        :type "dot")))
+          (save-graph (render-graph (make-and-dfs component 9999999)) out-pn)
+          (when sb-c::*compile-progress*
+            (format *debug-io* "~%; Wrote graphviz of component ~A to ~A.~%" component out-pn))))
+      (enable-hook sb-c::ir2-convert))
+  #+end_src
+
+* Macros case study part 3: Scheme compiler
+  Let's open the guile source tree, under
+  ~module/language/cps/with-cps~
+  and talk about how with-cps works, and what it does.
