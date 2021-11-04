@@ -2,4 +2,5 @@
 *.log
 _minted*
 auto
-#*
+\#*
+.\#*
