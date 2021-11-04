@@ -1,0 +1,6 @@
+\begin{Verbatim}[commandchars=\\\{\}]
+\PYG{p}{(}\PYG{k}{lambda }\PYG{p}{(}\PYG{n+nf}{arg1} \PYG{n+nv}{arg2}\PYG{p}{)}
+  \PYG{p}{(}\PYG{n+nf}{function\PYGZhy{}evaluated\PYGZhy{}first} \PYG{n+nv}{arg1}\PYG{p}{)}
+  \PYG{p}{(}\PYG{n+nf}{function\PYGZhy{}evaluated\PYGZhy{}second} \PYG{n+nv}{arg2}\PYG{p}{)}
+  \PYG{p}{(}\PYG{n+nf}{function\PYGZhy{}evaluated\PYGZhy{}third} \PYG{n+nv}{arg1} \PYG{n+nv}{arg2}\PYG{p}{))}
+\end{Verbatim}

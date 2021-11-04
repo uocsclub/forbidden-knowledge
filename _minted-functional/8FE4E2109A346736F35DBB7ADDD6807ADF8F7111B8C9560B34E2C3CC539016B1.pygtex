@@ -1,0 +1,7 @@
+\begin{Verbatim}[commandchars=\\\{\}]
+\PYG{n+nv}{func}\PYG{p}{(}\PYG{n+nf}{a1,} \PYG{n+nv}{a2,} \PYG{n+nv}{a3}\PYG{p}{)}
+
+\PYG{n+nv}{gets} \PYG{n+nv}{turned} \PYG{n+nv}{into}
+
+\PYG{p}{(}\PYG{n+nf}{func} \PYG{n+nv}{a1} \PYG{n+nv}{a2} \PYG{n+nv}{a3}\PYG{p}{)}
+\end{Verbatim}

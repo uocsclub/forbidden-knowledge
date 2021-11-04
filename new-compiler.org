@@ -1,0 +1,66 @@
+#+Title: a good new compiler
+
+* good?
+  The problem tht I'm trying to solve is the one of compiler
+  construction, generally. Writing that down, though, I'm struck by
+  how naive that sounds, despite that I /feel/ that it's something
+  that is solveable.
+
+  I'm not saying that I should provide a system that hides the
+  compelxity of compiler construction "for the masses," but instead
+  that I need to expose the facilities to extend the compiler in a
+  very easy way.
+
+  
+  
+* High level structure
+  I need to implement each of:
+
+  Syntax -> Parser -> IR ->
+
+  Compiler construction ->
+
+  VMR -> Assembly -> running the code
+
+  What's an example of a compiler construction? A function definition
+  might be one, but this does require re-elaborating what we're doing.
+
+  Have an "expression" be a first class thing in the language, and
+  then make the parser literally just be calling the constructors as a
+  direct translation of the AST, and the function definition be
+  literally just normal user code which takes expressions as input.
+
+  Yes, having all statements *actually* return expressions is the
+  right way to do this. I can't believe I've never thought of this
+  before.
+
+  This is the right way to do this. And, the names literally evaluate
+  to variables. A "variable" is then also a first class thing.
+
+  (of course it is a first class thing! /how have I never thought of
+  this before/)
+
+  And, then, there's more. But, how much more can I take?
+
+  Then, to make structures, we have basically "typed bufs" which
+  becomes our next first class thing. I think this is a another key
+  good abstraction, as well as storage classes.
+
+  Having allocator be a part of type! This is very important. If you
+  can say "I have a collection of objects which have this performance
+  characteristic in their operations," you're very far in your
+  abstraction.
+
+  And, structs at the REPL should be a beautiful experience (but isn't
+  right now, so that needs to be improved. An "awesome" experience, I
+  mean.)
+
+  Have a variable actually just be a "name", which is a first class
+  thing
+
+
+  So, what's the plan, stan?
+
+  - Elaborate the typesystem and what "expressions" are
+  - 
+  - Figure out how to do the 

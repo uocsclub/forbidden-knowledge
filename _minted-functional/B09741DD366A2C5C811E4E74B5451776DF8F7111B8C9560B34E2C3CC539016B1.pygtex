@@ -1,0 +1,9 @@
+\begin{Verbatim}[commandchars=\\\{\}]
+\PYG{l+m+mi}{12345}      \PYG{c+c1}{;; A number}
+\PYG{l+m+mf}{12.52}      \PYG{c+c1}{;; a floating point number}
+\PYG{n+no}{\PYGZsh{}f}         \PYG{c+c1}{;; the character \PYGZdq{}f\PYGZdq{}}
+\PYG{o}{\PYGZsh{}}\PYG{p}{(}\PYG{l+m+mi}{1} \PYG{l+m+mi}{2} \PYG{l+m+mi}{3} \PYG{l+m+mi}{4}\PYG{p}{)} \PYG{c+c1}{;; a vector constant}
+\PYG{n+no}{\PYGZsh{}t} \PYG{n+no}{\PYGZsh{}f}      \PYG{c+c1}{;; booleans}
+\PYG{l+s}{\PYGZdq{}string\PYGZdq{}}   \PYG{c+c1}{;; string}
+\PYG{o}{\PYGZsq{}}\PYG{p}{(}\PYG{n+nv}{a} \PYG{n+nv}{b} \PYG{n+nv}{c} \PYG{n+nv}{d}\PYG{p}{)} \PYG{c+c1}{;; a literal list of symbols}
+\end{Verbatim}
